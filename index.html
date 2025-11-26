@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todoist Benzeri Liste</title>
+  <!-- Inter Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+  <!-- Babel Standalone JSX'i tarayıcıda dönüştürmek için eklendi -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- React ve ReactDOM kütüphaneleri unpkg CDN'den eklendi -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <!-- type="module" yerine type="text/babel" kullanıyoruz -->
+  <script type="text/babel">
+    // React'ı global scope'tan alıyoruz
+    const { useState, useEffect } = window.React;
+    const ReactDOM = window.ReactDOM;
+
+    // Geçici Proje ve Etiket Verisi
+    const projects = [
+      { id: 1, name: "Gelen Kutusu (Inbox)", icon: "📥", link: "#inbox" },
+      { id: 2, name: "Bugün (Today)", icon: "🗓️", link: "#today" },
+      { id: 3, name: "Yaklaşan (Upcoming)", icon: "📅", link: "#upcoming" }
+    ];
+
+    const labels = [
+      { id: 4, name: "Fitness", link: "#fitness" },
+      { id: 5, name: "Alışveriş (Groceries)", link: "#groceries" },
+      { id: 6, name: "İş (Work)", link: "#work" }
+    ];
+
+    const App = () => {
+      // 1. To-Do Listesini tutan durum (state). İlk yüklemede localStorage'dan çekiyoruz.
+      const [todos, setTodos] = useState(() => {
+        const savedTodos = localStorage.getItem('react-todoist-todos');
+        return savedTodos ? JSON.parse(savedTodos) : [];
+      });
+
+      // 2. Yeni eklenecek To-Do'nun metnini tutan durum
+      const [newTodoText, setNewTodoText] = useState('');
+
+      // 3. Düzenlenen görev için ID ve metni tutan durum
+      const [editingId, setEditingId] = useState(null);
+      const [editText, setEditText] = useState('');
+
+      // Mevcut filtreleme/görüntüleme durumu (şimdilik basit bir filtre)
+      const [activeFilter, setActiveFilter] = useState('today');
+
+      // Veri Kaydı (Persistence)
+      useEffect(() => {
+        localStorage.setItem('react-todoist-todos', JSON.stringify(todos));
+      }, [todos]);
+
+      // Yeni To-Do Ekleme İşlevi
+      const handleAddTodo = (event) => {
+        event.preventDefault();
+
+        const trimmedText = newTodoText.trim();
+        if (trimmedText === '') {
+          return;
+        }
+
+        const newTodo = {
+          id: Date.now(),
+          text: trimmedText,
+          completed: false,
+          // Bu noktada yeni görev varsayılan olarak 'today' filtresine atanır
+          project: 'today'
+        };
+
+        setTodos([newTodo, ...todos]);
+        setNewTodoText('');
+      };
+
+      // Tamamlanma durumunu değiştiren fonksiyon
+      const handleToggleComplete = (id) => {
+        const updatedTodos = todos.map(todo => {
+          if (todo.id === id) {
+            return {
+              ...todo,
+              completed: !todo.completed
+            };
+          }
+          return todo;
+        });
+
+        setTodos(updatedTodos);
+      };
+
+      // To-Do Silme İşlevi
+      const handleDeleteTodo = (id) => {
+        const updatedTodos = todos.filter(todo => todo.id !== id);
+        setTodos(updatedTodos);
+      };
+
+      // Düzenleme Başlatma İşlevi
+      const handleStartEdit = (todo) => {
+        setEditingId(todo.id);
+        setEditText(todo.text);
+      };
+
+      // Düzenleme Kaydetme İşlevi
+      const handleSaveEdit = (id) => {
+        if (editText.trim() === '') {
+          handleDeleteTodo(id);
+          setEditingId(null);
+          return;
+        }
+
+        const updatedTodos = todos.map(todo => {
+          if (todo.id === id) {
+            return {
+              ...todo,
+              text: editText.trim()
+            };
+          }
+          return todo;
+        });
+
+        setTodos(updatedTodos);
+        setEditingId(null);
+      };
+
+      // Aktif filtreye göre görevleri filtreleme
+      const filteredTodos = todos.filter(todo => {
+        // Şimdilik sadece "today" filtresini aktif ediyoruz
+        if (activeFilter === 'today') {
+          return true;
+        }
+        return false;
+      });
+
+      // Yan Kenar Çubuğu Bileşeni
+      const Sidebar = () => (
+        <div className="sidebar">
+          {/* Profil kısmı */}
+          <div className="profile-section">
+            <span className="profile-icon">👤</span>
+            <span className="profile-name">Kullanıcı Adı</span>
+          </div>
+
+          {/* Ana Projeler */}
+          <ul className="project-list">
+            {projects.map(p => (
+              <li
+                key={p.id}
+                className={`project-item ${activeFilter === p.link.substring(1) ? 'active' : ''}`}
+                onClick={() => setActiveFilter(p.link.substring(1))}
+              >
+                <span className="project-icon">{p.icon}</span>
+                <span className="project-name">{p.name}</span>
+              </li>
+            ))}
+          </ul>
+
+          <hr className="sidebar-divider" />
+
+          {/* Etiketler/Diğer Projeler */}
+          <div className="label-header">Etiketler</div>
+          <ul className="label-list">
+            {labels.map(l => (
+              <li
+                key={l.id}
+                className={`project-item ${activeFilter === l.link.substring(1) ? 'active' : ''}`}
+                onClick={() => setActiveFilter(l.link.substring(1))}
+              >
+                <span className="label-dot"></span>
+                <span className="project-name">{l.name}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+
+      // Ana İçerik Bileşeni
+      const MainContent = () => (
+        <div className="main-content">
+          <h1 className="title">Bugün (Today)</h1>
+          <p className="subtitle">Hadi günlük görevlerini tamamlayalım!</p>
+
+          {/* 🚀 To-Do Ekleme Formu */}
+          <form onSubmit={handleAddTodo} className="input-form">
+            <input
+              type="text"
+              placeholder="Yeni bir görev yazın..."
+              value={newTodoText}
+              onChange={(e) => setNewTodoText(e.target.value)}
+              className="todo-input"
+              disabled={editingId !== null}
+            />
+            <button
+              type="submit"
+              className="add-button"
+              disabled={editingId !== null}
+            >
+              Ekle
+            </button>
+          </form>
+
+          {/* 📋 To-Do Listesi */}
+          <ul className="todo-list">
+            {filteredTodos.length === 0 ? (
+              <p className="empty-message">Bu filtreye ait görev yok. Yeni bir görev ekle!</p>
+            ) : (
+              filteredTodos.map(todo => (
+                <li
+                  key={todo.id}
+                  className={`todo-item ${todo.completed ? 'completed' : ''}`}
+                >
+                  {editingId === todo.id ? (
+                    // Düzenleme Modu
+                    <>
+                      <input
+                        type="text"
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        className="edit-input"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSaveEdit(todo.id);
+                          } else if (e.key === 'Escape') {
+                            setEditingId(null);
+                          }
+                        }}
+                      />
+                      <div className="action-buttons">
+                        <button
+                          onClick={() => handleSaveEdit(todo.id)}
+                          className="action-button save-button"
+                          aria-label="Kaydet"
+                        >
+                          &#x2714;
+                        </button>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="action-button cancel-button"
+                          aria-label="İptal"
+                        >
+                          &#x2715;
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    // Normal Görüntüleme Modu
+                    <>
+                      <input
+                        type="checkbox"
+                        checked={todo.completed}
+                        onChange={() => handleToggleComplete(todo.id)}
+                        className="todo-checkbox"
+                      />
+
+                      <span className="todo-text" onDoubleClick={() => handleStartEdit(todo)}>
+                        {todo.text}
+                      </span>
+
+                      <div className="action-buttons">
+                        <button
+                          onClick={() => handleStartEdit(todo)}
+                          className="action-button edit-icon"
+                          aria-label="Düzenle"
+                          title="Görevi Düzenle (çift tıklayarak da düzenleyebilirsiniz)"
+                        >
+                          &#9998;
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteTodo(todo.id)}
+                          className="action-button delete-button"
+                          aria-label={`Görevi sil: ${todo.text}`}
+                          title="Görevi Sil"
+                        >
+                          &#128465;
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      );
+
+      return (
+        <div className="app-layout">
+          {/* CSS Kodları */}
+          <style>{`
+                        /* --- GENEL TEMA VE YERLEŞİM --- */
+                        body {
+                            font-family: 'Inter', sans-serif;
+                            background-color: #f6f6f6; 
+                            margin: 0;
+                            min-height: 100vh;
+                        }
+                        
+                        /* İki Sütunlu Ana Düzen (Grid veya Flex) */
+                        .app-layout {
+                            display: flex;
+                            min-height: 100vh;
+                            background-color: #f6f6f6;
+                        }
+                        
+                        /* --- KENAR ÇUBUĞU (SIDEBAR) --- */
+                        .sidebar {
+                            width: 300px; /* Sabit genişlik */
+                            background-color: #fafafa;
+                            border-right: 1px solid #eee;
+                            padding: 20px 0;
+                            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.03);
+                        }
+
+                        .profile-section {
+                            display: flex;
+                            align-items: center;
+                            padding: 0 20px 20px 20px;
+                            font-weight: 600;
+                            color: #333;
+                            border-bottom: 1px solid #eee;
+                            margin-bottom: 10px;
+                        }
+                        .profile-icon {
+                            font-size: 1.5rem;
+                            margin-right: 10px;
+                        }
+
+                        .project-list, .label-list {
+                            list-style: none;
+                            padding: 0 0 10px 0;
+                            margin: 0;
+                        }
+
+                        .project-item {
+                            display: flex;
+                            align-items: center;
+                            padding: 10px 20px;
+                            cursor: pointer;
+                            font-size: 0.95rem;
+                            color: #444;
+                            transition: background-color 0.1s;
+                            border-radius: 4px;
+                            margin: 2px 10px;
+                        }
+                        .project-item:hover {
+                            background-color: #eeeeee;
+                        }
+                        .project-item.active {
+                            background-color: #feebe8; /* Açık Kırmızı Ton */
+                            font-weight: 600;
+                            color: #db4c3f;
+                        }
+                        .project-icon {
+                            margin-right: 15px;
+                            font-size: 1.1rem;
+                        }
+                        
+                        .sidebar-divider {
+                            border: 0;
+                            height: 1px;
+                            background: #eee;
+                            margin: 10px 20px;
+                        }
+                        
+                        .label-header {
+                            padding: 10px 20px 5px 20px;
+                            font-weight: 600;
+                            color: #888;
+                            text-transform: uppercase;
+                            font-size: 0.8rem;
+                        }
+                        .label-dot {
+                            display: inline-block;
+                            width: 8px;
+                            height: 8px;
+                            border-radius: 50%;
+                            background-color: #1e88e5; /* Mavi Etiket Rengi */
+                            margin-right: 15px;
+                        }
+
+                        /* --- ANA İÇERİK (MAIN CONTENT) --- */
+                        .main-content {
+                            flex-grow: 1;
+                            padding: 40px 60px;
+                            max-width: 900px; /* İçeriğin çok yayılmasını engelle */
+                        }
+
+                        .title {
+                            text-align: left;
+                            color: #1a1a1a;
+                            margin-bottom: 5px;
+                            font-size: 2.5rem;
+                            font-weight: 800;
+                        }
+                        
+                        .subtitle {
+                            color: #888;
+                            margin-bottom: 30px;
+                        }
+
+                        /* --- TODO LİSTESİ STİLLERİ (Öncekilerden Geliştirildi) --- */
+                        
+                        .input-form {
+                            display: flex;
+                            gap: 12px;
+                            margin-bottom: 40px;
+                            padding: 20px;
+                            border: 1px solid #ddd;
+                            border-radius: 12px;
+                            background-color: #fff;
+                            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+                        }
+                        
+                        .todo-input {
+                            flex-grow: 1;
+                            padding: 12px 15px;
+                            border: 1px solid #ccc;
+                            border-radius: 6px;
+                            font-size: 1rem;
+                            transition: border-color 0.2s, box-shadow 0.2s;
+                        }
+                        
+                        .todo-input:focus {
+                            outline: none;
+                            border-color: #db4c3f;
+                            box-shadow: 0 0 0 3px rgba(219, 76, 63, 0.2);
+                        }
+                        
+                        .add-button {
+                            padding: 12px 25px;
+                            background-color: #db4c3f;
+                            color: white;
+                            border: none;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 1rem;
+                            font-weight: 600;
+                            transition: background-color 0.2s, transform 0.1s;
+                        }
+                        
+                        .add-button:hover {
+                            background-color: #c03e31;
+                        }
+                        
+                        .add-button:active {
+                            transform: scale(0.98);
+                        }
+
+                        .todo-list {
+                            list-style: none;
+                            padding: 0;
+                            margin: 0;
+                        }
+                        
+                        .empty-message {
+                            text-align: center;
+                            color: #999;
+                            padding: 40px 0;
+                            border: 1px dashed #ddd;
+                            border-radius: 8px;
+                            background-color: #fafafa;
+                        }
+                        
+                        .todo-item {
+                            display: flex;
+                            align-items: center;
+                            padding: 15px 0;
+                            border-bottom: 1px solid #f0f0f0;
+                            cursor: default;
+                            transition: background-color 0.1s;
+                        }
+                        
+                        .todo-item:hover {
+                            background-color: #fff;
+                        }
+
+                        .todo-item:last-child {
+                            border-bottom: none;
+                        }
+                        
+                        .todo-checkbox {
+                            appearance: none;
+                            min-width: 18px;
+                            min-height: 18px;
+                            border: 2px solid #ccc; /* Daha yumuşak gri sınır */
+                            border-radius: 50%; 
+                            cursor: pointer;
+                            margin-right: 18px;
+                            transition: background-color 0.2s, border-color 0.2s;
+                            position: relative;
+                        }
+                        /*... (Diğer checkbox, text, action-buttons stilleri öncekiyle aynı) ...*/
+                        .todo-checkbox:checked {
+                            border-color: #4CAF50; 
+                            background-color: #4CAF50; 
+                        }
+                        
+                        .todo-checkbox:checked::after {
+                            content: '✓';
+                            position: absolute;
+                            top: 50%;
+                            left: 50%;
+                            transform: translate(-50%, -50%);
+                            color: white;
+                            font-size: 10px;
+                            font-weight: 700;
+                        }
+
+                        .todo-text, .edit-input {
+                            flex-grow: 1;
+                            font-size: 1.1rem;
+                            color: #333;
+                            line-height: 1.4;
+                        }
+                        
+                        .todo-item.completed .todo-text {
+                            text-decoration: line-through;
+                            color: #b3b3b3;
+                        }
+                        
+                        .edit-input {
+                            padding: 8px 10px;
+                            border: 1px solid #ccc;
+                            border-radius: 6px;
+                            margin-left: -5px; 
+                            font-size: 1.1rem;
+                        }
+
+                        .action-buttons {
+                            margin-left: 15px;
+                            display: flex;
+                            gap: 8px;
+                        }
+
+                        .action-button {
+                            background: none;
+                            border: none;
+                            color: #a8a8a8;
+                            cursor: pointer;
+                            padding: 5px;
+                            font-size: 1.1rem;
+                            transition: color 0.2s, transform 0.1s;
+                        }
+
+                        .action-button:hover {
+                            color: #555;
+                        }
+                        
+                        .delete-button:hover {
+                            color: #dc2626;
+                        }
+
+                        .save-button {
+                            color: #4CAF50;
+                        }
+                        .save-button:hover {
+                            color: #388E3C;
+                        }
+
+                        .cancel-button {
+                            color: #dc2626;
+                        }
+                        .cancel-button:hover {
+                            color: #b91c1c;
+                        }
+
+                        .edit-icon:hover {
+                            color: #1e88e5;
+                        }
+
+                        /* Mobil Uyumluluk */
+                        @media (max-width: 900px) {
+                            .sidebar {
+                                width: 250px;
+                            }
+                            .main-content {
+                                padding: 30px 40px;
+                            }
+                        }
+                        @media (max-width: 600px) {
+                            .app-layout {
+                                flex-direction: column;
+                            }
+                            .sidebar {
+                                width: 100%;
+                                border-right: none;
+                                border-bottom: 1px solid #eee;
+                                padding: 10px 0;
+                            }
+                            .main-content {
+                                padding: 20px;
+                            }
+                            .title {
+                                font-size: 2rem;
+                            }
+                            .input-form {
+                                flex-direction: column;
+                                gap: 15px;
+                            }
+                            .add-button {
+                                width: 100%;
+                            }
+                        }
+                    `}</style>
+
+          {/* ⭐️ YENİ: İki Sütunlu Düzenin Uygulanması */}
+          <Sidebar />
+          <MainContent />
+        </div>
+      );
+    };
+
+    // Uygulamayı DOM'a render et
+    const rootElement = document.getElementById('root');
+    if (rootElement) {
+      // React 18 ile Root oluşturma
+      const root = ReactDOM.createRoot(rootElement);
+      root.render(
+        <React.StrictMode>
+          <App />
+        </React.StrictMode>
+      );
+    }
+  </script>
+</body>
+
+</html>
